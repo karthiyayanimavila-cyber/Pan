@@ -1,0 +1,3 @@
+aiogram>=3.31,<4
+pyrofork>=2.3,<3
+TgCrypto>=1.2.5
