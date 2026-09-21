@@ -6,68 +6,81 @@ from pathlib import Path
 
 
 class ConfigError(RuntimeError):
-    pass
+    """Raised when required runtime configuration is missing."""
 
 
 def _int_set(value: str) -> frozenset[int]:
-    result: set[int] = set()
-    for item in value.split(","):
-        item = item.strip()
-        if item:
+    values: set[int] = set()
+    for raw in value.split(","):
+        raw = raw.strip()
+        if raw:
             try:
-                result.add(int(item))
+                values.add(int(raw))
             except ValueError as exc:
-                raise ConfigError(f"Invalid numeric ID: {item!r}") from exc
-    return frozenset(result)
+                raise ConfigError(f"Invalid numeric Telegram ID: {raw!r}") from exc
+    return frozenset(values)
 
 
 @dataclass(frozen=True)
 class Settings:
+    api_id: int
+    api_hash: str
     bot_token: str
-    admin_ids: frozenset[int]
-    target_channel_id: str | None
-    db_path: Path
+    owner_ids: frozenset[int]
+    mongo_url: str | None
+    mongo_db: str
+    redis_url: str | None
+    support_chat: str
+    update_channel: str
+    start_image: str | None
+    bot_name: str
+    workdir: Path
     runtime_dir: Path
     port: int
-    poll_timeout: int
+    heartbeat_seconds: int
     poll_stale_seconds: int
     restart_backoff_seconds: int
-    use_drafts: bool
-    enable_pyrofork: bool
-    pyro_api_id: int | None
-    pyro_api_hash: str | None
-    pyro_session_name: str
-    pyro_source_chat_ids: frozenset[int]
+    log_level: str
+
+    def is_owner(self, user_id: int) -> bool:
+        return user_id in self.owner_ids
 
 
 def load_settings() -> Settings:
-    token = os.getenv("BOT_TOKEN", "").strip()
-    if not token:
-        raise ConfigError("BOT_TOKEN is required")
-    admin_ids = _int_set(os.getenv("ADMIN_IDS", ""))
-    if not admin_ids:
-        raise ConfigError("ADMIN_IDS must contain at least one numeric Telegram user ID")
+    missing: list[str] = []
+    api_id = os.getenv("API_ID", "").strip()
+    api_hash = os.getenv("API_HASH", "").strip()
+    bot_token = os.getenv("BOT_TOKEN", "").strip()
+    if not api_id:
+        missing.append("API_ID")
+    if not api_hash:
+        missing.append("API_HASH")
+    if not bot_token:
+        missing.append("BOT_TOKEN")
+    if missing:
+        raise ConfigError("Missing required environment variables: " + ", ".join(missing))
 
-    api_id = os.getenv("PYRO_API_ID", "").strip()
-    api_hash = os.getenv("PYRO_API_HASH", "").strip()
-    enable_pyrofork = os.getenv("ENABLE_PYROFORK", "false").lower() in {"1", "true", "yes", "on"}
-    if enable_pyrofork and (not api_id or not api_hash):
-        raise ConfigError("ENABLE_PYROFORK=true requires PYRO_API_ID and PYRO_API_HASH")
+    owner_ids = _int_set(os.getenv("OWNER_IDS", os.getenv("ADMIN_IDS", "")))
+    if not owner_ids:
+        raise ConfigError("OWNER_IDS must contain at least one numeric Telegram user ID")
 
     return Settings(
-        bot_token=token,
-        admin_ids=admin_ids,
-        target_channel_id=os.getenv("TARGET_CHANNEL_ID", "").strip() or None,
-        db_path=Path(os.getenv("DB_PATH", "data/panbot.sqlite3")),
+        api_id=int(api_id),
+        api_hash=api_hash,
+        bot_token=bot_token,
+        owner_ids=owner_ids,
+        mongo_url=os.getenv("MONGO_URL", "").strip() or None,
+        mongo_db=os.getenv("MONGO_DB", "pan"),
+        redis_url=os.getenv("REDIS_URL", "").strip() or None,
+        support_chat=os.getenv("SUPPORT_CHAT", "").strip(),
+        update_channel=os.getenv("UPDATE_CHANNEL", "").strip(),
+        start_image=os.getenv("START_IMAGE", "").strip() or None,
+        bot_name=os.getenv("BOT_NAME", "Pan"),
+        workdir=Path(os.getenv("WORKDIR", "data/sessions")),
         runtime_dir=Path(os.getenv("RUNTIME_DIR", ".runtime")),
         port=max(1, int(os.getenv("PORT", "8080"))),
-        poll_timeout=max(1, int(os.getenv("POLL_TIMEOUT", "30"))),
+        heartbeat_seconds=max(5, int(os.getenv("HEARTBEAT_SECONDS", "15"))),
         poll_stale_seconds=max(30, int(os.getenv("POLL_STALE_SECONDS", "90"))),
         restart_backoff_seconds=max(1, int(os.getenv("RESTART_BACKOFF_SECONDS", "5"))),
-        use_drafts=os.getenv("USE_DRAFTS", "true").lower() in {"1", "true", "yes", "on"},
-        enable_pyrofork=enable_pyrofork,
-        pyro_api_id=int(api_id) if api_id else None,
-        pyro_api_hash=api_hash or None,
-        pyro_session_name=os.getenv("PYRO_SESSION_NAME", "pan_mtproto"),
-        pyro_source_chat_ids=_int_set(os.getenv("PYRO_SOURCE_CHAT_IDS", "")),
+        log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
     )

@@ -1,3 +1,12 @@
-aiogram>=3.31,<4
+# MTProto update client, as used by the Emilia-style plugin architecture.
 pyrofork>=2.3,<3
 TgCrypto>=1.2.5
+
+# Typed Bot API 10.3 sender for rich messages; never used for polling.
+aiogram>=3.31,<4
+
+# Runtime services.
+aiohttp[speedups]>=3.10,<4
+motor>=3.6,<4
+redis>=5,<7
+uvloop>=0.21; platform_system != "Windows"

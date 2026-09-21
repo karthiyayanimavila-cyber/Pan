@@ -4,6 +4,6 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY panbot ./panbot
 COPY .env.example ./
-RUN mkdir -p /app/data /app/.runtime
+RUN mkdir -p /app/data/sessions /app/.runtime
 ENV PYTHONUNBUFFERED=1
 CMD ["python", "-m", "panbot"]

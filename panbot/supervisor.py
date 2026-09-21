@@ -22,7 +22,7 @@ def _stop(child: subprocess.Popen[bytes] | None) -> None:
     try:
         child.wait(timeout=10)
     except subprocess.TimeoutExpired:
-        log.warning("Poller did not stop gracefully; killing it")
+        log.warning("Pan worker did not stop gracefully; killing it")
         child.kill()
         child.wait(timeout=5)
 
@@ -30,7 +30,7 @@ def _stop(child: subprocess.Popen[bytes] | None) -> None:
 def main() -> None:
     settings = load_settings()
     settings.runtime_dir.mkdir(parents=True, exist_ok=True)
-    heartbeat = settings.runtime_dir / "poller.heartbeat"
+    heartbeat = settings.runtime_dir / "worker.heartbeat"
     heartbeat.unlink(missing_ok=True)
     child: subprocess.Popen[bytes] | None = None
     stopping = False
@@ -46,20 +46,20 @@ def main() -> None:
     try:
         while not stopping:
             heartbeat.unlink(missing_ok=True)
-            log.info("Starting polling worker")
-            child = subprocess.Popen([sys.executable, "-m", "panbot.poller"])
+            log.info("Starting Pan worker")
+            child = subprocess.Popen([sys.executable, "-m", "panbot.runner"])
             started = time.monotonic()
             while not stopping:
                 exit_code = child.poll()
                 if exit_code is not None:
-                    log.warning("Polling worker exited with code %s", exit_code)
+                    log.warning("Pan worker exited with code %s", exit_code)
                     break
                 if heartbeat.exists():
                     age = time.time() - heartbeat.stat().st_mtime
                 else:
                     age = time.monotonic() - started
                 if age > settings.poll_stale_seconds:
-                    log.error("Polling heartbeat is stale (%.1fs); restarting worker", age)
+                    log.error("Pan worker heartbeat is stale (%.1fs); restarting worker", age)
                     _stop(child)
                     break
                 time.sleep(2)
